@@ -2,8 +2,6 @@ name: Build and push image
 
 on:
   workflow_call:
-  push:
-    branches: [main]
 
 env:
   REGISTRY: ghcr.io
