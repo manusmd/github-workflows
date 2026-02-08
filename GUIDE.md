@@ -58,15 +58,15 @@ name: Build and push image
 on:
   push:
     branches: [main]
+permissions:
+  contents: read
+  packages: write
 jobs:
   build-push:
     uses: manusmd/github-workflows/.github/workflows/build-push.yml@main
-    permissions:
-      contents: read
-      packages: write
 ```
 
-The caller must grant `packages: write` so the reusable workflow can push the image to GHCR.
+The caller must grant `packages: write` at **workflow** level so the reusable workflow can push the image to GHCR.
 
 ### 3. Pin a version (optional)
 

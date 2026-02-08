@@ -50,12 +50,12 @@ name: Build and push image
 on:
   push:
     branches: [main]
+permissions:
+  contents: read
+  packages: write
 jobs:
   build-push:
     uses: <owner>/github-workflows/.github/workflows/build-push.yml@main
-    permissions:
-      contents: read
-      packages: write
 ```
 
 Workflows run in your app repo (checkout, `github.repository`, Docker push go to your repo). Updates to this template repo apply to all callers when they use `@main`, or pin with `@v1` for stability.
