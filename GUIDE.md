@@ -1,17 +1,19 @@
 # Pipeline usage guide
 
-How to use the [manusmd/github-workflows](https://github.com/manusmd/github-workflows) pipeline template in a project (e.g. Next.js app). The pipeline runs CI and builds/pushes a Docker image to GHCR; deployment is done manually via ArgoCD in your infrastructure repo.
+How to use the [manusmd/github-workflows](https://github.com/manusmd/github-workflows) pipeline in a project (e.g. Next.js app). One workflow runs CI and optionally builds/pushes a Docker image to GHCR. Deployment is done manually via ArgoCD in your infrastructure repo.
 
 ---
 
 ## What the pipeline does
 
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| **CI** | Push / PR to `main` | Lint, typecheck, test, Next.js build. Node version from `.nvmrc`. |
-| **Build and push image** | Push to `main` | Build Docker image, push to GitHub Container Registry. Image tag: `[version]-[branch]-[short sha]`. |
+One workflow with two jobs:
 
-Deployment is **not** included. Use the image tag from the workflow run in your infra repo with ArgoCD.
+| Job | When it runs | Purpose |
+|-----|--------------|---------|
+| **ci** | Always | Lint, typecheck, test, Next.js build. Node version from `.nvmrc`. |
+| **build-push** | Only when `push_image: true` (e.g. push to `main`) | Build Docker image, push to GHCR. Image tag: `[version]-[branch]-[short sha]`. |
+
+On **pull requests** to `main`: only CI runs. On **push** to `main`: CI runs, then build-push runs. Deployment is **not** included; use the image tag in your infra repo with ArgoCD.
 
 ---
 
@@ -26,111 +28,107 @@ Deployment is **not** included. Use the image tag from the workflow run in your 
 
 ## Option A – Reusable workflow (recommended)
 
-No copy of the workflow logic. Your repo only defines triggers and calls the template.
+One file in your app repo. No copy of the pipeline logic.
 
-**Requirements for reusable workflows:**
+**Requirements:**
 
-- The template repo **manusmd/github-workflows** must be **public**, so your app repo can access it. If it is private, reusable workflows only work when both repos are in the same GitHub organization (with a plan that allows it) and the template repo grants access.
-- Use the **default branch** of the template repo in the `uses` line. If the default branch is `main`, use `@main`; if it is `master`, use `@master`. Reusable workflows are read from the default branch only.
+- The template repo **manusmd/github-workflows** must be **public** (or both repos in the same org with access to reusable workflows from private repos).
+- Use the template repo’s **default branch** in the `uses` line (`@main` or `@master`).
 
-### 1. Add CI workflow
+### Add the pipeline
 
-Create `.github/workflows/ci.yml` in your app repo:
+Create `.github/workflows/pipeline.yml` in your app repo:
 
 ```yaml
-name: CI
+name: Pipeline
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-jobs:
-  ci:
-    uses: manusmd/github-workflows/.github/workflows/ci.yml@main
-```
-
-### 2. Add build-push workflow
-
-Create `.github/workflows/build-push.yml` in your app repo:
-
-```yaml
-name: Build and push image
-on:
-  push:
-    branches: [main]
 permissions:
   contents: read
   packages: write
 jobs:
-  build-push:
-    uses: manusmd/github-workflows/.github/workflows/build-push.yml@main
+  pipeline:
+    uses: manusmd/github-workflows/.github/workflows/pipeline.yml@main
+    with:
+      push_image: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 ```
 
-The caller must grant `packages: write` at **workflow** level so the reusable workflow can push the image to GHCR.
+- **Push or PR to `main`** → CI runs.
+- **Push to `main`** → CI runs, then image is built and pushed. PRs do not push an image.
 
-### 3. Pin a version (optional)
-
-To avoid picking up template changes automatically, use a tag instead of `@main`:
-
-```yaml
-uses: manusmd/github-workflows/.github/workflows/ci.yml@v1
-```
-
-Create a tag (e.g. `v1`) in the template repo when you want to freeze the version.
+To pin a version, use a tag (e.g. `@v1`) instead of `@main` in the `uses` line.
 
 ---
 
-## Option B – Copy the workflows
+## Option B – Copy the workflow
 
-Copy the **contents** of these files from [manusmd/github-workflows](https://github.com/manusmd/github-workflows) into your app repo:
+Copy the **contents** of [manusmd/github-workflows/.github/workflows/pipeline.yml](https://github.com/manusmd/github-workflows/blob/main/.github/workflows/pipeline.yml) into your app repo as `.github/workflows/pipeline.yml`. You then need to add triggers and pass the input yourself, e.g.:
 
-- `.github/workflows/ci.yml`
-- `.github/workflows/build-push.yml`
+```yaml
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+# ... then the jobs from the template, with push_image set as in Option A
+```
 
-You then own the YAML and can change it per repo. You won’t get updates from the template repo unless you copy again.
+Or copy the file and add the `on` and `with` at the top. You own the YAML and won’t get updates from the template repo unless you copy again.
 
 ---
 
 ## Image tag format
 
-Each push to `main` produces an image tagged as:
+When the image is pushed (push to `main`), the tag is:
 
 **`[version]-[branch]-[short sha]`**
 
-Examples:
+Examples: `1.0.0-main-a1b2c3d`, `2.1.3-main-f7e8d9c`.
 
-- `1.0.0-main-a1b2c3d`
-- `2.1.3-main-f7e8d9c`
-
-Full image: `ghcr.io/<owner>/<repo>:<tag>` (e.g. `ghcr.io/myorg/my-app:1.0.0-main-a1b2c3d`).
-
-Branch names with `/` (e.g. `feature/foo`) become `-` in the tag (e.g. `1.0.0-feature-foo-a1b2c3d`).
+Full image: `ghcr.io/<owner>/<repo>:<tag>`. Branch names with `/` become `-` in the tag.
 
 ---
 
 ## Getting the image tag for ArgoCD
 
 1. In your app repo, go to **Actions**.
-2. Open the latest **Build and push image** run.
-3. In the run summary, find the **Image tag summary** step. It shows the full image and tag to use.
-4. In your infrastructure repo, set that image (or tag) in ArgoCD / Helm so the cluster pulls the new version.
+2. Open the latest **Pipeline** run (from a push to `main`).
+3. In the run summary, open the **build-push** job and find the **Image tag summary** step. It shows the full image and tag.
+4. Use that image (or tag) in your infrastructure repo (ArgoCD / Helm).
 
 ---
 
 ## Troubleshooting: "workflow was not found"
 
-If you see `workflow was not found` when calling `manusmd/github-workflows/.github/workflows/ci.yml@main`:
+If you see `workflow was not found` when calling `manusmd/github-workflows/.github/workflows/pipeline.yml@main`:
 
 1. **Make the template repo public**  
-   In **manusmd/github-workflows**: Settings → General → Danger zone → Change visibility → Public. Then any repo can call the workflows.
+   In **manusmd/github-workflows**: Settings → General → Danger zone → Change visibility → Public.
 
 2. **Use the template repo’s default branch**  
-   In **manusmd/github-workflows**, check the default branch (Settings → General → Default branch). If it is `master`, use `@master` in the `uses` line instead of `@main`.
+   If the default branch is `master`, use `@master` instead of `@main`.
 
-3. **If you keep the template repo private**  
-   Your app repo must be in the **same organization** as manusmd/github-workflows, and the org must allow “Access to reusable workflows from private repositories”. In the template repo: Settings → Actions → General → “Access to reusable workflows from private repositories” and allow your org.
+3. **If the template repo stays private**  
+   Your app repo must be in the **same organization** and the org must allow “Access to reusable workflows from private repositories” for that repo.
 
-Until the template repo is public or the private-access setup is done, use **Option B – Copy the workflows** so the YAML lives in your app repo.
+Until then, use **Option B – Copy** so the workflow lives in your app repo.
+
+---
+
+## Troubleshooting: "packages: write" / permissions
+
+If the build-push job fails with permission errors, ensure your **caller** workflow has at **workflow** level:
+
+```yaml
+permissions:
+  contents: read
+  packages: write
+```
+
+(same indentation as `name` and `on`).
 
 ---
 
@@ -139,6 +137,6 @@ Until the template repo is public or the private-access setup is done, use **Opt
 - [ ] Dockerfile at repo root
 - [ ] `.nvmrc` with Node version
 - [ ] `package.json` with `version` and `lint` / `typecheck` / `test` / `build` scripts
-- [ ] `.github/workflows/ci.yml` and `.github/workflows/build-push.yml` added (reusable or copied)
+- [ ] `.github/workflows/pipeline.yml` added (reusable or copied)
 - [ ] Push to `main` to run CI and build/push image
-- [ ] Use the image tag from the Actions run in your infra repo for ArgoCD
+- [ ] Use the image tag from the Pipeline run in your infra repo for ArgoCD
