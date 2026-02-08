@@ -20,6 +20,7 @@ Deployment is done manually in your infrastructure repo with ArgoCD. Use the ima
 ## Requirements
 
 - **App repo:** Must contain a `Dockerfile` at the repo root (and optionally `.dockerignore`). This template only provides the workflows; the Dockerfile lives in each app repo.
+- **Node version:** CI uses the version from `.nvmrc` if present; otherwise it defaults to 20.
 - **Scripts in `package.json`:** `lint`, `typecheck`, `test`, `build`. Add no-op scripts if you don’t use one (e.g. `"typecheck": "echo ok"`).
 - **GHCR:** The workflow uses `GITHUB_TOKEN`; the repo’s packages must be readable by whoever runs ArgoCD (e.g. pull from GHCR with a PAT or deploy key).
 
