@@ -6,7 +6,7 @@ Single pipeline for Next.js frontends: CI (lint, typecheck, test, build) then op
 
 One reusable workflow **Pipeline** with two jobs:
 
-1. **ci** – Lint, typecheck, test, Next.js build. Node version from `.nvmrc`. Always runs.
+1. **ci** – Install deps, dependency audit (fails on high/critical), lint, typecheck, test, Next.js build. Node version from `.nvmrc`. Always runs.
 2. **build-push** – Build Docker image, push to GHCR. Runs only when `push_image: true` (e.g. on push to `main`).
 
 Image tag: `[version]-[branch]-[short sha]` (e.g. `1.0.0-main-a1b2c3d`). Full image: `ghcr.io/<owner>/<repo>:<tag>`.

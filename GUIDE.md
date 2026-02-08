@@ -10,7 +10,7 @@ One workflow with two jobs:
 
 | Job | When it runs | Purpose |
 |-----|--------------|---------|
-| **ci** | Always | Lint, typecheck, test, Next.js build. Node version from `.nvmrc`. |
+| **ci** | Always | Install deps, dependency audit (fails on high/critical), lint, typecheck, test, Next.js build. Node version from `.nvmrc`. |
 | **build-push** | Only when `push_image: true` (e.g. push to `main`) | Build Docker image, push to GHCR. Image tag: `[version]-[branch]-[short sha]`. |
 
 On **pull requests** to `main`: only CI runs. On **push** to `main`: CI runs, then build-push runs. Deployment is **not** included; use the image tag in your infra repo with ArgoCD.

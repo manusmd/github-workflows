@@ -18,6 +18,7 @@ defaults:
 
 jobs:
   ci:
+    name: CI (lint, typecheck, test, build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
       - name: Lint
         run: npm run lint
 
@@ -49,6 +53,7 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
 
   build-push:
+    name: Build and push image
     needs: ci
     if: ${{ inputs.push_image }}
     runs-on: ubuntu-latest
