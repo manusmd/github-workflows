@@ -46,3 +46,23 @@ jobs:
 
 **Option B – Copy**  
 Copy `.github/workflows/pipeline.yml` from this repo into your app repo. You own the YAML and can change it per repo.
+
+## `build-and-deploy.yml` — ArgoCD deploy pipeline
+
+A second reusable workflow for projects that keep their Helm `chart/` in the
+app repo and let ArgoCD watch that repo directly (the `projects-infrastructure`
+onboarding model). On push to `main` it builds the repo's `Dockerfile`, pushes
+`ghcr.io/<owner>/<app-name>:<git-sha>`, then bumps `image.tag` in the repo's own
+`chart/values.yaml` and commits it. Lives here (public) so public app repos can
+call it — a public repo cannot use a reusable workflow from a private repo.
+
+```yaml
+jobs:
+  build-and-deploy:
+    permissions:
+      contents: write
+      packages: write
+    uses: manusmd/github-workflows/.github/workflows/build-and-deploy.yml@main
+    with:
+      app-name: my-app
+```
